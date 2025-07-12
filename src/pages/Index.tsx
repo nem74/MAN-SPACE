@@ -6,22 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-
-interface Reply {
-  id: string;
-  message: string;
-  timestamp: Date;
-  likes: number;
-}
-
-interface Post {
-  id: string;
-  title: string;
-  message: string;
-  timestamp: Date;
-  replies: Reply[];
-  likes: number;
-}
+import { postsApi, Post, Reply } from '@/services/api';
 
 const Index = () => {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -30,51 +15,30 @@ const Index = () => {
   const [replyInputs, setReplyInputs] = useState<{ [key: string]: string }>({});
   const [showNewPostForm, setShowNewPostForm] = useState(false);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for demonstration
+  // Load posts from API
   useEffect(() => {
-    const mockPosts: Post[] = [
-      {
-        id: '1',
-        title: 'Struggling with work-life balance',
-        message: 'I feel like I\'m constantly torn between being present for my family and meeting work demands. The pressure is overwhelming and I don\'t know how to find the right balance.',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-        likes: 12,
-        replies: [
-          {
-            id: '1-1',
-            message: 'I\'ve been there. What helped me was setting clear boundaries - no work emails after 7pm. It took time but my family appreciated it.',
-            timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-            likes: 8
-          },
-          {
-            id: '1-2',
-            message: 'Consider talking to your manager about flexible hours. Many companies are more understanding than we think.',
-            timestamp: new Date(Date.now() - 30 * 60 * 1000),
-            likes: 5
-          }
-        ]
-      },
-      {
-        id: '2',
-        title: 'Dealing with loneliness after divorce',
-        message: 'The house feels so empty now. I\'m not sure how to rebuild my social life or even where to start. Some days are harder than others.',
-        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-        likes: 18,
-        replies: [
-          {
-            id: '2-1',
-            message: 'Divorce is one of life\'s biggest changes. Be patient with yourself. Consider joining local groups or activities you enjoy - even small steps count.',
-            timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-            likes: 12
-          }
-        ]
+    const loadPosts = async () => {
+      try {
+        const postsData = await postsApi.getAllPosts();
+        setPosts(postsData);
+      } catch (error) {
+        console.error('Error loading posts:', error);
+        toast({
+          title: "Error loading posts",
+          description: "Please try again later.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
       }
-    ];
-    setPosts(mockPosts);
+    };
+
+    loadPosts();
   }, []);
 
-  const handleSubmitPost = () => {
+  const handleSubmitPost = async () => {
     if (!newPostTitle.trim() || !newPostMessage.trim()) {
       toast({
         title: "Please fill in both title and message",
@@ -83,75 +47,86 @@ const Index = () => {
       return;
     }
 
-    const newPost: Post = {
-      id: Date.now().toString(),
-      title: newPostTitle,
-      message: newPostMessage,
-      timestamp: new Date(),
-      replies: [],
-      likes: 0
-    };
-
-    setPosts(prev => [newPost, ...prev]);
-    setNewPostTitle('');
-    setNewPostMessage('');
-    setShowNewPostForm(false);
-    
-    toast({
-      title: "Your post has been shared anonymously",
-      description: "Thank you for trusting this community with your thoughts."
-    });
+    try {
+      const newPost = await postsApi.createPost(newPostTitle, newPostMessage);
+      setPosts(prev => [newPost, ...prev]);
+      setNewPostTitle('');
+      setNewPostMessage('');
+      setShowNewPostForm(false);
+      
+      toast({
+        title: "Your post has been shared anonymously",
+        description: "Thank you for trusting this community with your thoughts."
+      });
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast({
+        title: "Error creating post",
+        description: "Please try again later.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleSubmitReply = (postId: string) => {
+  const handleSubmitReply = async (postId: string) => {
     const replyMessage = replyInputs[postId];
     if (!replyMessage?.trim()) return;
 
-    const newReply: Reply = {
-      id: Date.now().toString(),
-      message: replyMessage,
-      timestamp: new Date(),
-      likes: 0
-    };
-
-    setPosts(prev => prev.map(post => 
-      post.id === postId 
-        ? { ...post, replies: [...post.replies, newReply] }
-        : post
-    ));
-
-    setReplyInputs(prev => ({ ...prev, [postId]: '' }));
-    
-    toast({
-      title: "Reply sent",
-      description: "Your supportive message has been added."
-    });
+    try {
+      const updatedPost = await postsApi.addReply(postId, replyMessage);
+      setPosts(prev => prev.map(post => 
+        post._id === postId ? updatedPost : post
+      ));
+      setReplyInputs(prev => ({ ...prev, [postId]: '' }));
+      
+      toast({
+        title: "Reply sent",
+        description: "Your supportive message has been added."
+      });
+    } catch (error) {
+      console.error('Error adding reply:', error);
+      toast({
+        title: "Error adding reply",
+        description: "Please try again later.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleLikePost = (postId: string) => {
-    setPosts(prev => prev.map(post => 
-      post.id === postId 
-        ? { ...post, likes: post.likes + 1 }
-        : post
-    ));
+  const handleLikePost = async (postId: string) => {
+    try {
+      const updatedPost = await postsApi.likePost(postId);
+      setPosts(prev => prev.map(post => 
+        post._id === postId ? updatedPost : post
+      ));
+    } catch (error) {
+      console.error('Error liking post:', error);
+      toast({
+        title: "Error liking post",
+        description: "Please try again later.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleLikeReply = (postId: string, replyId: string) => {
-    setPosts(prev => prev.map(post => 
-      post.id === postId 
-        ? {
-            ...post, 
-            replies: post.replies.map(reply => 
-              reply.id === replyId 
-                ? { ...reply, likes: reply.likes + 1 }
-                : reply
-            )
-          }
-        : post
-    ));
+  const handleLikeReply = async (postId: string, replyId: string) => {
+    try {
+      const updatedPost = await postsApi.likeReply(postId, replyId);
+      setPosts(prev => prev.map(post => 
+        post._id === postId ? updatedPost : post
+      ));
+    } catch (error) {
+      console.error('Error liking reply:', error);
+      toast({
+        title: "Error liking reply",
+        description: "Please try again later.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const formatTimeAgo = (date: Date) => {
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
@@ -163,6 +138,17 @@ const Index = () => {
       return `${Math.floor(diffInMinutes / 1440)}d ago`;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-700 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading posts...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -230,7 +216,7 @@ const Index = () => {
         {/* Posts Feed */}
         <div className="space-y-6">
           {posts.map(post => (
-            <Card key={post.id} className="border-slate-200 shadow-lg hover:shadow-xl transition-shadow">
+            <Card key={post._id} className="border-slate-200 shadow-lg hover:shadow-xl transition-shadow">
               <CardContent className="p-6">
                 <div className="space-y-4">
                   {/* Post Header */}
@@ -256,7 +242,7 @@ const Index = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleLikePost(post.id)}
+                        onClick={() => handleLikePost(post._id)}
                         className="text-slate-600 hover:text-red-600 hover:bg-red-50"
                       >
                         <Heart className="h-4 w-4 mr-1" />
@@ -265,7 +251,7 @@ const Index = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setExpandedPost(expandedPost === post.id ? null : post.id)}
+                        onClick={() => setExpandedPost(expandedPost === post._id ? null : post._id)}
                         className="text-slate-600 hover:text-slate-800"
                       >
                         <MessageSquare className="h-4 w-4 mr-1" />
@@ -275,11 +261,11 @@ const Index = () => {
                   </div>
 
                   {/* Replies Section */}
-                  {expandedPost === post.id && (
+                  {expandedPost === post._id && (
                     <div className="space-y-4 pt-4 border-t border-slate-100">
                       {/* Existing Replies */}
                       {post.replies.map(reply => (
-                        <div key={reply.id} className="bg-slate-50 rounded-lg p-4 ml-4">
+                        <div key={reply._id} className="bg-slate-50 rounded-lg p-4 ml-4">
                           <p className="text-slate-700 mb-2">{reply.message}</p>
                           <div className="flex items-center justify-between text-sm">
                             <div className="flex items-center gap-1 text-slate-500">
@@ -289,7 +275,7 @@ const Index = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleLikeReply(post.id, reply.id)}
+                              onClick={() => handleLikeReply(post._id, reply._id)}
                               className="text-slate-500 hover:text-red-600 hover:bg-red-50 h-6 px-2"
                             >
                               <ArrowUp className="h-3 w-3 mr-1" />
@@ -303,14 +289,14 @@ const Index = () => {
                       <div className="flex gap-2 ml-4">
                         <Textarea
                           placeholder="Share some support or advice..."
-                          value={replyInputs[post.id] || ''}
-                          onChange={(e) => setReplyInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
+                          value={replyInputs[post._id] || ''}
+                          onChange={(e) => setReplyInputs(prev => ({ ...prev, [post._id]: e.target.value }))}
                           rows={3}
                           className="flex-1 border-slate-300 focus:border-slate-500"
                         />
                         <Button
-                          onClick={() => handleSubmitReply(post.id)}
-                          disabled={!replyInputs[post.id]?.trim()}
+                          onClick={() => handleSubmitReply(post._id)}
+                          disabled={!replyInputs[post._id]?.trim()}
                           className="bg-slate-700 hover:bg-slate-800 text-white self-end"
                         >
                           <Send className="h-4 w-4" />
@@ -325,7 +311,7 @@ const Index = () => {
         </div>
 
         {/* Empty State */}
-        {posts.length === 0 && (
+        {posts.length === 0 && !loading && (
           <Card className="border-slate-200 shadow-lg">
             <CardContent className="p-12 text-center">
               <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
