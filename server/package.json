@@ -2,7 +2,7 @@
 {
   "name": "manspace-backend",
   "version": "1.0.0",
-  "description": "Backend API for ManSpace - Anonymous support platform for men",
+  "description": "Backend for ManSpace - A safe space for men to share and support each other",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -16,8 +16,5 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=14.0.0"
   }
 }
