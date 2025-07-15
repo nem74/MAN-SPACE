@@ -6,7 +6,8 @@ const dotenv = require('dotenv');
 const postRoutes = require('./routes/posts');
 
 dotenv.config();
-
+ 
+console.log("MONGO_URI loaded:", process.env.MONGO_URI='mongodb+srv://nehemiahkiptoo7:KIPTOONEM@cluster0.kauwuqr.mongodb.net/manspace?retryWrites=true&w=majority&appName=Cluster0');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -23,7 +24,7 @@ const connectDB = require('./routes/db');
 
 connectDB();
 
-mongoose.connect(process.env.MONGODB_URI, { 
+mongoose.connect(process.env.MONGO_URI, { 
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
